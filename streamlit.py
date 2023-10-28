@@ -1,8 +1,12 @@
 import streamlit as st
-import speech_recognition as sr
 from textblob import TextBlob
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
+import os
+import requests
+
+# Set your Google Cloud credentials environment variable (replace 'YOUR_CREDENTIALS' with your actual path)
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = "YOUR_CREDENTIALS.json"
 
 # Initialize variables to store mood data
 mood_data = {'Happy': 0, 'Sad': 0, 'Neutral': 0}
@@ -49,7 +53,7 @@ st.title("Mood Analyzer")
 
 # Record and analyze speech
 if st.button("Record and Analyze"):
-    user_input = speech_to_text()
+    user_input = recognize_speech()
     update_mood(user_input)
     st.write(f"You said: {user_input}")
     st.write(f"Mood: {get_weekly_mood()}")
@@ -63,3 +67,32 @@ st.pyplot(fig)
 
 # Display weekly overall mood
 st.write(f"Weekly Overall Mood: {get_weekly_mood()}")
+
+def recognize_speech():
+    audio_data = st.audio("Recording...", format="audio/wav")
+    
+    if audio_data:
+        # Convert audio data to text using Google Cloud Speech-to-Text API
+        response = transcribe_audio(audio_data)
+        return response
+    else:
+        return "Speech not recognized"
+
+def transcribe_audio(audio_data):
+    endpoint = "https://speech.googleapis.com/v1/speech:recognize"
+    data = {
+        "config": {"encoding": "LINEAR16", "sampleRateHertz": 16000, "languageCode": "en-US"},
+        "audio": {"content": audio_data},
+    }
+
+    response = requests.post(
+        endpoint, json=data
+    )
+
+    if response.status_code == 200:
+        result = response.json()
+        if "results" in result:
+            transcripts = [alt["transcript"] for alt in result["results"][0]["alternatives"]]
+            return "\n".join(transcripts)
+    
+    return "Speech not recognized"
